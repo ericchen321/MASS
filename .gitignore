@@ -2,3 +2,8 @@ build/
 *.so
 *.a
 nn/
+
+build_MASS/
+build_MASS2/
+build_MASS3/
+__pycache__/

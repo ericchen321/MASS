@@ -400,7 +400,9 @@ if __name__=="__main__":
 		print('Provide meta file')
 		exit()
 
+	print(f"loading PPO")
 	ppo = PPO(args.meta)
+	print(f"loaded PPO")
 	nn_dir = '../nn'
 	if not os.path.exists(nn_dir):
 	    os.makedirs(nn_dir)
@@ -413,3 +415,4 @@ if __name__=="__main__":
 		ppo.Train()
 		rewards = ppo.Evaluate()
 		Plot(rewards,'reward',0,False)
+		print(f"iteration {i} done")
