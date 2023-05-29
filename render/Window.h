@@ -38,6 +38,9 @@ private:
 	void Step();
 	void Reset();
 
+	// functions for sampling sim data
+	void SaveSimDataToDisk();
+
 	Eigen::VectorXd GetActionFromNN();
 	Eigen::VectorXd GetActivationFromNN(const Eigen::VectorXd& mt);
 
@@ -53,6 +56,14 @@ private:
 	bool mNNLoaded;
 	bool mMuscleNNLoaded;
 	Eigen::Affine3d mViewMatrix;
+	
+	// structures for sampling sim data
+	int num_steps;
+	int step_idx;
+	int dof;
+	Eigen::MatrixXd qfrc_bias;
+	Eigen::MatrixXd qfrc_constraint;
+	// bool mSimDataSaved;
 };
 };
 

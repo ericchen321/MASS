@@ -3,6 +3,8 @@
 #include "Character.h"
 #include "BVH.h"
 #include "Muscle.h"
+#include <H5Cpp.h>
+using namespace H5;
 #include <iostream>
 using namespace MASS;
 using namespace dart;
@@ -70,6 +72,14 @@ Window(Environment* env,const std::string& nn_path,const std::string& muscle_nn_
 
 	py::object load = muscle_nn_module.attr("load");
 	load(muscle_nn_path);
+
+	// initialize structures for sampling sim data
+	num_steps = 900;
+	dof = 56;
+	step_idx = 0;
+	qfrc_bias = Eigen::MatrixXd::Zero(num_steps, dof);
+	qfrc_constraint = Eigen::MatrixXd::Zero(num_steps, dof);
+	// mSimDataSaved = false;
 }
 void
 Window::
@@ -111,6 +121,7 @@ keyboard(unsigned char _key, int _x, int _y)
 	case 'r': this->Reset();break;
 	case ' ': mSimulating = !mSimulating;break;
 	case 'o': mDrawOBJ = !mDrawOBJ;break;
+	case 'd': this->SaveSimDataToDisk();break;
 	case 27 : exit(0);break;
 	default:
 		Win3D::keyboard(_key,_x,_y);break;
@@ -123,6 +134,10 @@ displayTimer(int _val)
 {
 	if(mSimulating)
 		Step();
+	// if(~mSimDataSaved && step_idx == num_steps){
+	// 	this->SaveSimDataToDisk();
+	// 	mSimDataSaved = true;
+	// }
 	glutPostRedisplay();
 	glutTimerFunc(mDisplayTimeout, refreshTimer, _val);
 }
@@ -146,6 +161,35 @@ Step()
 			mEnv->SetActivationLevels(GetActivationFromNN(mt));
 			for(int j=0;j<inference_per_sim;j++)
 				mEnv->Step();
+				if (step_idx < num_steps){
+					qfrc_bias.row(
+						step_idx) = mEnv->GetCharacter(
+						)->GetSkeleton()->getCoriolisAndGravityForces();
+					qfrc_constraint.row(
+						step_idx) = mEnv->GetCharacter(
+						)->GetSkeleton()->getConstraintForces();
+				}
+				else if (step_idx == num_steps) {
+					std::cout << "Simulation data of " << num_steps << " steps sampled." << std::endl;
+				}
+
+				// Show the magnitude of forces
+				// std::cout << "Coriolis and gravity forces: " << std::endl;
+				// std::cout << mEnv->GetCharacter(
+				// )->GetSkeleton()->getCoriolisAndGravityForces().norm() << std::endl;
+				// std::cout << "Constraint forces: " << std::endl;
+				// std::cout << mEnv->GetCharacter(
+				// )->GetSkeleton()->getConstraintForces().norm() << std::endl;
+				// if (step_idx == 200) {
+				// 	std::cout << "Constraint forces from DART: " << std::endl;
+				// 	std::cout << mEnv->GetCharacter(
+				// 	)->GetSkeleton()->getConstraintForces() << std::endl;
+				// 	std::cout << "Constraint forces assigned to EigenXd: " << std::endl;
+				// 	std::cout << qfrc_constraint.row(step_idx) << std::endl;
+				// }
+
+				// increment step index
+				step_idx += 1;
 		}	
 	}
 	else
@@ -154,6 +198,38 @@ Step()
 			mEnv->Step();	
 	}
 	
+}
+void Window::
+SaveSimDataToDisk(){
+	std::cout << "Saving simulation data..." << std::endl;
+	std::string data_dir = "../data/sim_data/";
+
+	std::string file_name = "sim_data";
+	// file_name += std::to_string(mSimDataIdx);
+	file_name += ".h5";
+	std::string path = data_dir + file_name;
+	hid_t file_id = H5Fcreate(path.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+	hsize_t dims[2];
+	dims[0] = num_steps;
+	dims[1] = dof;
+	hid_t dataspace_id = H5Screate_simple(2, dims, NULL);
+
+	// save qfrc_bias
+	hid_t dataset_id = H5Dcreate2(file_id, "/qfrc_bias", H5T_NATIVE_DOUBLE, dataspace_id,
+		H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+	H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, qfrc_bias.data());
+	H5Dclose(dataset_id);
+
+	// save qfrc_constraint
+	dataset_id = H5Dcreate2(file_id, "/qfrc_constraint", H5T_NATIVE_DOUBLE, dataspace_id,
+		H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+	H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, qfrc_constraint.data());
+	H5Dclose(dataset_id);
+	
+	H5Sclose(dataspace_id);
+	H5Fclose(file_id);
+	std::cout << "Saved sim data to " << path << std::endl;
+	// mSimDataIdx += 1;
 }
 void
 Window::

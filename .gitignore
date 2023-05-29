@@ -6,4 +6,8 @@ nn/
 build_MASS/
 build_MASS2/
 build_MASS3/
+
 __pycache__/
+.vscode/
+
+data/sim_data/
